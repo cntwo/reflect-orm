@@ -207,18 +207,7 @@ namespace ReflectORM.Core
                 reader.Dispose();
             }           
         }
-
-        /// <summary>
-        /// Executes the reader.
-        /// </summary>
-        /// <param name="comm">The comm.</param>
-        /// <returns></returns>
-        [Obsolete("Use DbDataReader ExecuteReader now", false)]
-        public virtual SqlDataReader ExecuteReader(SqlCommand comm)
-        {
-            return (SqlDataReader)ExecuteReader((DbCommand)comm);
-        }
-
+        
         /// <summary>
         /// Executes a command object and returns a reader
         /// </summary>
