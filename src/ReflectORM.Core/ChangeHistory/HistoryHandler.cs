@@ -19,6 +19,9 @@ namespace ReflectORM.Core.ChangeHistory
             : base(connectionString)
         { }
 
+        /// <summary>
+        /// Gets the sort column.
+        /// </summary>
         protected override string SortColumn
         {
             get
@@ -27,6 +30,14 @@ namespace ReflectORM.Core.ChangeHistory
             }
         }
 
+        /// <summary>
+        /// Gets the latest record.
+        /// </summary>
+        /// <param name="id">The id.</param>
+        /// <param name="historyTableName">Name of the history table.</param>
+        /// <param name="historyColumnTableName">Name of the history column table.</param>
+        /// <param name="columnName">Name of the column.</param>
+        /// <returns></returns>
         public virtual History GetLatestRecord(int id, string historyTableName, string historyColumnTableName, string columnName)
         {
             DbCommand command = ProfiledConnection.CreateCommand();

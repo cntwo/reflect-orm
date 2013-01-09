@@ -17,6 +17,9 @@ namespace ReflectORM.Core.ChangeHistory
         /// <param name="connectionString">The connection string.</param>
         public HistoryColumnHandler(string connectionString) : base(connectionString) { }
 
+        /// <summary>
+        /// Gets the sort column.
+        /// </summary>
         protected override string SortColumn
         {
             get
@@ -25,6 +28,14 @@ namespace ReflectORM.Core.ChangeHistory
             }
         }
 
+        /// <summary>
+        /// Gets the latest record.
+        /// </summary>
+        /// <param name="id">The id.</param>
+        /// <param name="historyTableName">Name of the history table.</param>
+        /// <param name="historyColumnTableName">Name of the history column table.</param>
+        /// <param name="columnName">Name of the column.</param>
+        /// <returns></returns>
         public virtual HistoryColumn GetLatestRecord(int id, string historyTableName, string historyColumnTableName, string columnName)
         {
             var retval = string.Empty;

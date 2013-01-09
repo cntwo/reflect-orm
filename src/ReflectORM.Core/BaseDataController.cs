@@ -1117,11 +1117,6 @@ namespace ReflectORM.Core
                     retVal = iiData.Id;
                 }
             }
-            catch (Exception ex)
-            {
-                //CBRI.ErrorProcessing.ExceptionHandlers.ExceptionHandler(ref ex, "CBRI.Database", "0.1", "exchange.campden.co.uk", "", "m.coull@campden.co.uk", true, "SSave", "BaseDataController");
-                throw;
-            }
             finally
             {
                 CleanUp(reader);
@@ -1149,54 +1144,47 @@ namespace ReflectORM.Core
             IAuditable iOldData = currentData as IAuditable;
 
             List<PropertyInfo> changedProperties = new List<PropertyInfo>();
-            try
+            if (insert) //this is new data
             {
-                if (insert) //this is new data
+                changedProperties = new List<PropertyInfo>(typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public));
+            }
+            else //updating
+            {
+                //these properties are the same forever
+                iData.CreatedBy = iOldData.CreatedBy;
+                iData.CreatedOn = iOldData.CreatedOn;
+
+                var comparer = new ObjectComparer<T>();
+                var comparison = comparer.Compare(currentData, data);
+                changedProperties = comparison.ChangedProperties;
+            }
+
+            List<HistoryColumn> columnhistories = CreateColumnHistories(currentData, data, changedProperties, history);
+            if (columnhistories.Count > 0)
+            {
+                HistoryHandler handler = new HistoryHandler(this.Connection.ConnectionString);
+                handler.DatabaseTableName = HistoryTableName;
+
+                HistoryColumnHandler columnHandler = new HistoryColumnHandler(this.Connection.ConnectionString);
+                columnHandler.DatabaseTableName = HistoryColumnTableName;
+
+                if (history.CreatedOn == null || history.CreatedOn < SqlDateTime.MinValue.Value)
+                    history.CreatedOn = DateTime.Now;
+                history.Id = handler.SSave(history);
+                history.Columns = columnhistories;
+
+                foreach (HistoryColumn hc in columnhistories)
                 {
-                    changedProperties = new List<PropertyInfo>(typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public));
-                }
-                else //updating
-                {
-                    //these properties are the same forever
-                    iData.CreatedBy = iOldData.CreatedBy;
-                    iData.CreatedOn = iOldData.CreatedOn;
-
-                    var comparer = new ObjectComparer<T>();
-                    var comparison = comparer.Compare(currentData, data);
-                    changedProperties = comparison.ChangedProperties;
-                }
-
-                List<HistoryColumn> columnhistories = CreateColumnHistories(currentData, data, changedProperties, history);
-                if (columnhistories.Count > 0)
-                {
-                    HistoryHandler handler = new HistoryHandler(this.Connection.ConnectionString);
-                    handler.DatabaseTableName = HistoryTableName;
-
-                    HistoryColumnHandler columnHandler = new HistoryColumnHandler(this.Connection.ConnectionString);
-                    columnHandler.DatabaseTableName = HistoryColumnTableName;
-
-                    if (history.CreatedOn == null || history.CreatedOn < SqlDateTime.MinValue.Value)
-                        history.CreatedOn = DateTime.Now;
-                    history.Id = handler.SSave(history);
-                    history.Columns = columnhistories;
-
-                    foreach (HistoryColumn hc in columnhistories)
-                    {
-                        hc.HistoryId = history.Id;
-                        columnHandler.SSave(hc);
-                    }
-                }
-                else
-                {
-                    //If there are no non-audit fields then any changedProperties elements will just be changes to audit
-                    //fields. If the audit fields are the the only fields that have changed then we shouldn't alter the
-                    //database record, therefore we should empty the changedProperties list.
-                    changedProperties.Clear();
+                    hc.HistoryId = history.Id;
+                    columnHandler.SSave(hc);
                 }
             }
-            catch (Exception ex)
+            else
             {
-                throw;
+                //If there are no non-audit fields then any changedProperties elements will just be changes to audit
+                //fields. If the audit fields are the the only fields that have changed then we shouldn't alter the
+                //database record, therefore we should empty the changedProperties list.
+                changedProperties.Clear();
             }
 
             return changedProperties;
@@ -1573,6 +1561,12 @@ namespace ReflectORM.Core
             return SOperation(command, FromDb);
         }
 
+        /// <summary>
+        /// Get's the latest history column record
+        /// </summary>
+        /// <param name="id">The id.</param>
+        /// <param name="columnName">Name of the column.</param>
+        /// <returns></returns>
         public virtual History SGetLatestHistoryColumn(int id, string columnName)
         {
             HistoryHandler hc = new HistoryHandler(this.Connection.ConnectionString);
@@ -1679,6 +1673,12 @@ namespace ReflectORM.Core
             return OperationList(SelectCommand, list, FromDb, true);
         }
 
+        /// <summary>
+        /// Get common records
+        /// </summary>
+        /// <param name="data">The data.</param>
+        /// <param name="column">The column.</param>
+        /// <returns></returns>
         public virtual List<T> SGetCommon(T data, string column)
         {
             Type type = typeof(T);
@@ -1709,16 +1709,37 @@ namespace ReflectORM.Core
             throw new InvalidOperationException(string.Format("Invalid column {0}", column));
         }
 
+        /// <summary>
+        /// Get all records with a column with a specified value
+        /// </summary>
+        /// <param name="colValue">The col value.</param>
+        /// <param name="column">The column.</param>
+        /// <returns></returns>
         public List<T> SGetForColumn(object colValue, string column)
         {
             return SGetForColumn(colValue, column, false);
         }
 
+        /// <summary>
+        /// Get all records with a column with a specified value
+        /// </summary>
+        /// <param name="colValue">The col value.</param>
+        /// <param name="column">The column.</param>
+        /// <param name="sorted">if set to <c>true</c> [sorted].</param>
+        /// <returns></returns>
         public List<T> SGetForColumn(object colValue, string column, bool sorted)
         {
             return SGetForColumn(colValue, column, false, false);
         }
 
+        /// <summary>
+        /// Get all records with a column with a specified value
+        /// </summary>
+        /// <param name="colValue">The col value.</param>
+        /// <param name="column">The column.</param>
+        /// <param name="sorted">if set to <c>true</c> [sorted].</param>
+        /// <param name="ignoreDeletedStatus">if set to <c>true</c> [ignore deleted status].</param>
+        /// <returns></returns>
         public List<T> SGetForColumn(object colValue, string column, bool sorted, bool ignoreDeletedStatus)
         {
             var value = colValue;
@@ -1744,16 +1765,34 @@ namespace ReflectORM.Core
             return SGetByCriteria(colCriteria, sorted, ignoreDeletedStatus);
         }
 
+        /// <summary>
+        /// Get by Criteria using Generated SQL
+        /// </summary>
+        /// <param name="criterion">The criterion.</param>
+        /// <returns></returns>
         public List<T> SGetByCriteria(Criteria criterion)
         {
             return SGetByCriteria(criterion, false);
         }
 
+        /// <summary>
+        /// Get by Criteria using Generated SQL
+        /// </summary>
+        /// <param name="criterion">The criterion.</param>
+        /// <param name="sorted">if set to <c>true</c> [sorted].</param>
+        /// <returns></returns>
         public List<T> SGetByCriteria(Criteria criterion, bool sorted)
         {
             return SGetByCriteria(criterion, false, false);
         }
 
+        /// <summary>
+        /// Get by Criteria using Generated SQL
+        /// </summary>
+        /// <param name="criterion">The criterion.</param>
+        /// <param name="sorted">if set to <c>true</c> [sorted].</param>
+        /// <param name="ignoreDeletedStatus">if set to <c>true</c> [ignore deleted status].</param>
+        /// <returns></returns>
         public List<T> SGetByCriteria(Criteria criterion, bool sorted, bool ignoreDeletedStatus)
         {
             DbCommand command = ProfiledConnection.CreateCommand();

@@ -219,20 +219,13 @@ namespace ReflectORM.Core
         public virtual DbDataReader ExecuteReader(DbCommand comm)
         {
             DbDataReader reader = null;
-            try
-            {
-                CommandBehavior behavior = CommandBehavior.Default;
+            CommandBehavior behavior = CommandBehavior.Default;
 
-                if (_multipleConnections)
-                    behavior = CommandBehavior.CloseConnection;
+            if (_multipleConnections)
+                behavior = CommandBehavior.CloseConnection;
 
-                OpenConnection(comm.Connection);
-                reader = comm.ExecuteReader(behavior);
-            }
-            catch (Exception ex)
-            {
-                throw;
-            }
+            OpenConnection(comm.Connection);
+            reader = comm.ExecuteReader(behavior);
             return reader;
         }
 
@@ -309,10 +302,6 @@ namespace ReflectORM.Core
                 this.Connection.Open();
                 adapter.Fill(table);
                 result = true;
-            }
-            catch (SqlException ex)
-            {
-                throw;
             }
             finally
             {

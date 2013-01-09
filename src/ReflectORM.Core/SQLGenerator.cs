@@ -520,7 +520,6 @@ namespace ReflectORM.Core
         /// <summary>
         /// Generates the joins.
         /// </summary>
-        /// <param name="table">The table.</param>
         /// <returns></returns>
         private string GenerateJoins()
         {
@@ -531,7 +530,6 @@ namespace ReflectORM.Core
         /// Generates the joins.
         /// </summary>
         /// <param name="joins">The joins.</param>
-        /// <param name="table">The table.</param>
         /// <returns></returns>
         internal static string GenerateJoins(IEnumerable<Join> joins)
         {

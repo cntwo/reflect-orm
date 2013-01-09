@@ -124,15 +124,8 @@ namespace ReflectORM.Core
             SqlDataAdapter adapter = new SqlDataAdapter();
             DataTable dtResults = new DataTable(strTableName);
 
-            try
-            {
-                adapter = new SqlDataAdapter((SqlCommand)sqlComm);
-                adapter.Fill(dtResults);
-            }
-            catch (Exception ex)
-            {
-                throw;
-            }
+            adapter = new SqlDataAdapter((SqlCommand)sqlComm);
+            adapter.Fill(dtResults);
             return dtResults;
         }
 
