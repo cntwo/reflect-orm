@@ -21,7 +21,7 @@ namespace ReflectORM.Core
     /// Abstract data handler class.
     /// </summary>
     /// <typeparam name="T">The type of Data to handle.</typeparam>
-    public abstract class BaseDataController<T> : ApplicationDatabase
+    public abstract class BaseDataController<T> : ApplicationDatabase where T:class
     {
         /// <summary>
         /// The Database Table Name

@@ -136,9 +136,6 @@
     <Reference Include="System">
       <Name>System</Name>
     </Reference>
-    <Reference Include="System.Core, Version=3.5.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089, processorArchitecture=MSIL">
-      <RequiredTargetFramework>3.5</RequiredTargetFramework>
-    </Reference>
     <Reference Include="System.Data">
       <Name>System.Data</Name>
     </Reference>
@@ -190,7 +187,6 @@
     <Compile Include="SProcDbWriter.cs" />
     <Compile Include="SQLDbReader.cs" />
     <Compile Include="SQLDbWriter.cs" />
-    <Compile Include="ExcludeFromSearchStringAttribute.cs" />
     <Compile Include="Interfaces\IControllable.cs" />
     <Compile Include="ParameterExistsException.cs" />
     <Compile Include="DbUtilities.cs" />

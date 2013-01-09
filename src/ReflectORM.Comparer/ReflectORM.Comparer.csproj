@@ -45,6 +45,12 @@
     <Compile Include="Interfaces\IComparer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ReflectORM.Attributes\ReflectORM.Attributes.csproj">
+      <Project>{980B6DEC-592F-4E4E-BFC3-1F99C18B8BB4}</Project>
+      <Name>ReflectORM.Attributes</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
