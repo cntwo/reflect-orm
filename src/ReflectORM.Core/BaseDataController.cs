@@ -4,13 +4,13 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Data;
 using System.Data.Common;
-using System.Data.SqlClient;
 using System.Data.SqlTypes;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Xml;
+using ReflectORM.Attributes;
 using ReflectORM.Core.ChangeHistory;
 using ReflectORM.Extensions;
 using ReflectORM.Comparer;
@@ -21,17 +21,17 @@ namespace ReflectORM.Core
     /// Abstract data handler class.
     /// </summary>
     /// <typeparam name="T">The type of Data to handle.</typeparam>
-    public abstract class BaseDataController<T> : ApplicationDatabase where T:class
+    public abstract class BaseDataController<T> : ApplicationDatabase where T : class
     {
         /// <summary>
         /// The Database Table Name
         /// </summary>
-        protected string _databaseTableName = string.Empty;
+        private string _databaseTableName = string.Empty;
 
         /// <summary>
         /// The View to select from.
         /// </summary>
-        protected string _selectViewName = string.Empty;
+        private string _selectViewName = string.Empty;
 
         /// <summary>
         /// Get the name of the History table
@@ -74,7 +74,7 @@ namespace ReflectORM.Core
         /// Initializes a new instance of the <see cref="BaseDataController&lt;T&gt;"/> class.
         /// </summary>
         /// <param name="connectionString">The connection string.</param>
-        public BaseDataController(string connectionString) : base(connectionString) { _multipleConnections = true; }
+        protected BaseDataController(string connectionString) : base(connectionString) { _multipleConnections = true; }
 
         #endregion Contructors
 
@@ -126,7 +126,7 @@ namespace ReflectORM.Core
             {
                 _transaction = value;
                 if (!_transaction.IsNull())
-                    _transaction.Connection.StateChange += new StateChangeEventHandler(Connection_StateChange);
+                    _transaction.Connection.StateChange += Connection_StateChange;
             }
         }
 
@@ -150,13 +150,10 @@ namespace ReflectORM.Core
             get
             {
                 if (_databaseTableName != string.Empty) return _databaseTableName;
-                else
-                {
-                    string dbName = typeof(T).Name;
-                    if (dbName.ToLower().EndsWith(DataObjectSuffix.ToLower()) && dbName.Length > DataObjectSuffix.Length)
-                        return dbName.Substring(0, dbName.Length - DataObjectSuffix.Length);
-                    return dbName;
-                }
+                var dbName = typeof(T).Name;
+                if (dbName.ToLower().EndsWith(DataObjectSuffix.ToLower()) && dbName.Length > DataObjectSuffix.Length)
+                    return dbName.Substring(0, dbName.Length - DataObjectSuffix.Length);
+                return dbName;
             }
             set
             {
@@ -171,11 +168,7 @@ namespace ReflectORM.Core
         /// <value>The name of the select view.</value>
         public virtual string SelectViewName
         {
-            get
-            {
-                if (_selectViewName != string.Empty) return _selectViewName;
-                else return DatabaseTableName;
-            }
+            get { return _selectViewName != string.Empty ? _selectViewName : DatabaseTableName; }
             set { _selectViewName = value; }
         }
 
@@ -186,9 +179,7 @@ namespace ReflectORM.Core
         {
             get
             {
-                if (typeof(IAuditable).IsAssignableFrom(typeof(T))) //check to see if T is an IAuditable
-                    return "EditedOn";
-                return IdColumn;
+                return typeof(IAuditable).IsAssignableFrom(typeof(T)) ? "EditedOn" : IdColumn;
             }
         }
 
@@ -211,9 +202,8 @@ namespace ReflectORM.Core
         /// <returns>A completed T.</returns>
         protected delegate T GetDataDelegate(DbDataReader reader);
 
-        private void EmptyParams(T data, ref DbCommand command)
+        private static void EmptyParams(T data, ref DbCommand command)
         {
-            return; //nothing
         }
 
         #region Operation
@@ -229,8 +219,7 @@ namespace ReflectORM.Core
         /// </returns>
         protected virtual DbDataReader Operation(string commandText, T data, SetParameterDelegate setParam)
         {
-            bool forceNewConnection = false;
-            return Operation(commandText, data, setParam, forceNewConnection);
+            return Operation(commandText, data, setParam, false);
         }
 
         /// <summary>
@@ -276,12 +265,11 @@ namespace ReflectORM.Core
         /// </returns>
         protected virtual DbDataReader Operation(string commandText, T data, SetParameterDelegate setParam, CommandType commandType, bool forceNewConnection)
         {
-            DbCommand command = ProfiledConnection.CreateCommand();
+            var command = ProfiledConnection.CreateCommand();
             command.CommandText = commandText;
-            DbConnection connection = ProfiledConnection;
             if (!_transaction.IsNull() && !forceNewConnection)
             {
-                connection = _transaction.Connection;
+                var connection = _transaction.Connection;
                 command.Transaction = _transaction;
                 command.Connection = connection;
             }
@@ -314,8 +302,7 @@ namespace ReflectORM.Core
         /// </returns>
         protected virtual DbDataReader Operation(string commandText)
         {
-            bool forceNewConnection = false;
-            return Operation(commandText, forceNewConnection);
+            return Operation(commandText, false);
         }
 
         /// <summary>
@@ -341,8 +328,7 @@ namespace ReflectORM.Core
         /// </returns>
         protected virtual DbDataReader Operation(string commandText, CommandType commandType)
         {
-            bool forceNewConnection = false;
-            return Operation(commandText, commandType, forceNewConnection);
+            return Operation(commandText, commandType, false);
         }
 
         /// <summary>
@@ -369,8 +355,7 @@ namespace ReflectORM.Core
         /// </returns>
         protected virtual DbDataReader Operation(string commandText, SetParameterDelegate toDb)
         {
-            bool forceNewConnection = false;
-            return Operation(commandText, toDb, forceNewConnection);
+            return Operation(commandText, toDb, false);
         }
 
         /// <summary>
@@ -398,8 +383,7 @@ namespace ReflectORM.Core
         /// </returns>
         protected virtual DbDataReader Operation(string commandText, SetParameterDelegate toDb, CommandType commandType)
         {
-            bool forceNewConnection = false;
-            return Operation(commandText, toDb, commandType, forceNewConnection);
+            return Operation(commandText, toDb, commandType, false);
         }
 
         /// <summary>
@@ -427,8 +411,7 @@ namespace ReflectORM.Core
         /// </returns>
         protected virtual DbDataReader Operation(string commandText, ListDictionary parameters)
         {
-            bool forceNewConnection = false;
-            return Operation(commandText, parameters, forceNewConnection);
+            return Operation(commandText, parameters, false);
         }
 
         /// <summary>
@@ -456,8 +439,7 @@ namespace ReflectORM.Core
         /// </returns>
         protected virtual DbDataReader Operation(string commandText, ListDictionary parameters, CommandType commandType)
         {
-            bool forceNewConnection = false;
-            return Operation(commandText, parameters, commandType, forceNewConnection);
+            return Operation(commandText, parameters, commandType, false);
         }
 
         /// <summary>
@@ -490,8 +472,7 @@ namespace ReflectORM.Core
         /// <returns>The requested T.</returns>
         protected virtual T Operation(string commandText, ListDictionary parameters, GetDataDelegate fromDb)
         {
-            bool forceNewConnection = false;
-            return Operation(commandText, parameters, fromDb, forceNewConnection);
+            return Operation(commandText, parameters, fromDb, false);
         }
 
         /// <summary>
@@ -523,8 +504,7 @@ namespace ReflectORM.Core
         /// <returns>The requested T.</returns>
         protected virtual T Operation(string commandText, T data, SetParameterDelegate toDb, GetDataDelegate fromDb)
         {
-            bool forceNewConnection = false;
-            return Operation(commandText, data, toDb, fromDb, forceNewConnection);
+            return Operation(commandText, data, toDb, fromDb, false);
         }
 
         /// <summary>
@@ -538,12 +518,12 @@ namespace ReflectORM.Core
         /// <returns>The requested T.</returns>
         protected virtual T Operation(string commandText, T data, SetParameterDelegate toDb, GetDataDelegate fromDb, bool forceNewConnection)
         {
-            DbDataReader dr = Operation(commandText, data, toDb, forceNewConnection);
+            var dr = Operation(commandText, data, toDb, forceNewConnection);
             if (dr != null)
             {
                 if (dr.Read())
                 {
-                    T retval = fromDb(dr);
+                    var retval = fromDb(dr);
                     dr.Close();
                     return retval;
                 }
@@ -562,8 +542,7 @@ namespace ReflectORM.Core
         /// <returns>The requested T.</returns>
         protected virtual T Operation(string commandText, GetDataDelegate fromDb)
         {
-            bool forceNewConnection = false;
-            return Operation(commandText, fromDb, forceNewConnection);
+            return Operation(commandText, fromDb, false);
         }
 
         /// <summary>
@@ -575,12 +554,12 @@ namespace ReflectORM.Core
         /// <returns>The requested T.</returns>
         protected virtual T Operation(string commandText, GetDataDelegate fromDb, bool forceNewConnection)
         {
-            DbDataReader dr = Operation(commandText, forceNewConnection);
+            var dr = Operation(commandText, forceNewConnection);
             if (dr != null)
             {
                 if (dr.Read())
                 {
-                    T retval = fromDb(dr);
+                    var retval = fromDb(dr);
                     dr.Close();
                     return retval;
                 }
@@ -600,8 +579,7 @@ namespace ReflectORM.Core
         /// <returns>The requested T.</returns>
         protected virtual T Operation(string commandText, SetParameterDelegate toDb, GetDataDelegate fromDb)
         {
-            bool forceNewConnection = false;
-            return Operation(commandText, toDb, fromDb, forceNewConnection);
+            return Operation(commandText, toDb, fromDb, false);
         }
 
         #endregion Operation
@@ -703,9 +681,9 @@ namespace ReflectORM.Core
         /// <returns></returns>
         protected virtual List<T> SOperationList(DbCommand command, GetDataDelegate fromDb)
         {
-            List<T> retval = new List<T>();
+            var retval = new List<T>();
 
-            DbDataReader dr = SOperation(command);
+            var dr = SOperation(command);
 
             try
             {
@@ -730,8 +708,7 @@ namespace ReflectORM.Core
         /// <returns>A list of Ts.</returns>
         protected virtual List<T> OperationList(string commandText, GetDataDelegate fromDb)
         {
-            bool forceNewConnection = false;
-            return OperationList(commandText, fromDb, forceNewConnection);
+            return OperationList(commandText, fromDb, false);
         }
 
         /// <summary>
@@ -755,8 +732,7 @@ namespace ReflectORM.Core
         /// <returns>A list of Ts.</returns>
         protected virtual List<T> OperationList(string commandText, GetDataDelegate fromDb, CommandType commandType)
         {
-            bool forceNewConnection = false;
-            return OperationList(commandText, fromDb, commandType, forceNewConnection);
+            return OperationList(commandText, fromDb, commandType, false);
         }
 
         /// <summary>
@@ -781,8 +757,7 @@ namespace ReflectORM.Core
         /// <returns>A list of Ts.</returns>
         protected virtual List<T> OperationList(string commandText, ListDictionary parameters, GetDataDelegate fromDb)
         {
-            bool forceNewConnection = false;
-            return OperationList(commandText, parameters, fromDb, forceNewConnection);
+            return OperationList(commandText, parameters, fromDb, false);
         }
 
         /// <summary>
@@ -808,8 +783,7 @@ namespace ReflectORM.Core
         /// <returns>A list of Ts.</returns>
         protected virtual List<T> OperationList(string commandText, ListDictionary parameters, GetDataDelegate fromDb, CommandType commandType)
         {
-            bool forceNewConnection = false;
-            return OperationList(commandText, parameters, fromDb, commandType, forceNewConnection);
+            return OperationList(commandText, parameters, fromDb, commandType, false);
         }
 
         /// <summary>
@@ -842,8 +816,7 @@ namespace ReflectORM.Core
         /// <returns>A list of Ts.</returns>
         protected virtual List<T> OperationList(string commandText, T data, SetParameterDelegate toDb, GetDataDelegate fromDb)
         {
-            bool forceNewConnection = false;
-            return OperationList(commandText, data, toDb, fromDb, forceNewConnection);
+            return OperationList(commandText, data, toDb, fromDb, false);
         }
 
         /// <summary>
@@ -871,8 +844,7 @@ namespace ReflectORM.Core
         /// <returns>A list of Ts.</returns>
         protected virtual List<T> OperationList(string commandText, T data, SetParameterDelegate toDb, GetDataDelegate fromDb, CommandType commandType)
         {
-            bool forceNewConnection = false;
-            return OperationList(commandText, data, toDb, fromDb, commandType, forceNewConnection);
+            return OperationList(commandText, data, toDb, fromDb, commandType, false);
         }
 
         /// <summary>
@@ -887,9 +859,9 @@ namespace ReflectORM.Core
         /// <returns>A list of Ts.</returns>
         protected virtual List<T> OperationList(string commandText, T data, SetParameterDelegate toDb, GetDataDelegate fromDb, CommandType commandType, bool forceNewConnection)
         {
-            List<T> list = new List<T>();
+            var list = new List<T>();
 
-            DbDataReader dr = Operation(commandText, data, toDb, commandType, forceNewConnection);
+            var dr = Operation(commandText, data, toDb, commandType, forceNewConnection);
             if (dr != null)
             {
                 while (dr.Read())
@@ -918,11 +890,11 @@ namespace ReflectORM.Core
         /// <returns></returns>
         public virtual T Save(T data, DbTransaction transaction)
         {
-            string commandText = InsertCommand;
+            var commandText = InsertCommand;
             _transaction = transaction;
             if (IsUpdatable(data)) commandText = UpdateCommand;
 
-            T obj = Operation(commandText, data, ToDb, FromDb, false);
+            var obj = Operation(commandText, data, ToDb, FromDb, false);
 
             return obj;
         }
@@ -942,17 +914,8 @@ namespace ReflectORM.Core
         /// <returns></returns>
         public virtual bool BSave(T data, DbTransaction transaction)
         {
-            bool retVal = false;
-            try
-            {
-                Save(data, transaction);
-                retVal = true;
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
-            return retVal;
+            Save(data, transaction);
+            return true;
         }
 
         /// <summary>
@@ -998,23 +961,22 @@ namespace ReflectORM.Core
         /// <returns></returns>
         public virtual int SSave(T data, ref History history, DbTransaction transaction)
         {
-            int retVal = -1;
+            var retVal = -1;
             _transaction = transaction;
-            DbCommand command = ProfiledConnection.CreateCommand();
+            var command = ProfiledConnection.CreateCommand();
 
-            SQLGenerator<T> generator = new SQLGenerator<T>(command, true);
+            var generator = new SQLGenerator<T>(command, true);
             DbDataReader reader = null;
 
             try
             {
-                IIdentifiable iiData = data as IIdentifiable;
-                IControllable icData = data as IControllable;
-                IAuditable iaData = data as IAuditable;
+                var iiData = data as IIdentifiable;
+                var iaData = data as IAuditable;
 
                 if (iaData != null) //this record is auditable
                 {
-                    DateTime editedOnDefault = DateTime.Now;
-                    string editedByDefault = Environment.UserName;
+                    var editedOnDefault = DateTime.Now;
+                    var editedByDefault = Environment.UserName;
 
                     //If we have a history object...
                     if (history != null)
@@ -1024,7 +986,7 @@ namespace ReflectORM.Core
                             history.CreatedOn = editedOnDefault;
 
                         //Check that a valid value has been provided for the history's createdBy property
-                        if (history.CreatedBy == null || history.CreatedBy == string.Empty)
+                        if (string.IsNullOrEmpty(history.CreatedBy))
                             history.CreatedBy = editedByDefault;
 
                         //If the change happened chronologically after the last time the data was edited...
@@ -1043,18 +1005,18 @@ namespace ReflectORM.Core
                     }
                 }
 
-                bool insertingId = false;
+                var insertingId = false;
                 if (InsertId)
-                    insertingId = !SExists(iiData.Id);
+                    if (iiData != null) insertingId = !SExists(iiData.Id);
 
                 //updating
                 if (IsUpdatable(data) && !insertingId)
                 {
-                    List<PropertyInfo> changedProperties = new List<PropertyInfo>();
+                    var changedProperties = new List<PropertyInfo>();
 
                     if (history != null)
                     {
-                        bool insert = (history.Type == ChangeType.Insert);
+                        var insert = (history.Type == ChangeType.Insert);
                         if (history.Type != ChangeType.Delete && history.Type != ChangeType.Insert)
                             history.Type = ChangeType.Update;
                         if (iiData != null)
@@ -1064,7 +1026,7 @@ namespace ReflectORM.Core
 
                         //If we have nothing to save then we don't want to make a database save
                         if (changedProperties.Count <= 0)
-                            return iiData.Id;
+                            return iiData != null ? iiData.Id : DbConstants.DEFAULT_ID;
                     }
 
                     command.CommandText = generator.GenerateUpdate(DatabaseTableName, data, ToDb, IdColumn, changedProperties);
@@ -1088,10 +1050,6 @@ namespace ReflectORM.Core
 
                     command.CommandText = generator.GenerateInsert(DatabaseTableName, data, ToDb, IdColumn);
                 }
-                //REMOVE THESE COMMENTED LINES
-                //Exception ex2 = new DataOperationException(command, new Exception());
-
-                //CBRI.ErrorProcessing.ExceptionHandlers.ExceptionHandler(ref ex2, "CBRI.Database", "0.1", "exchange.campden.co.uk", "", "a.allen@campden.co.uk", true, "SSave", "BaseDataController");
 
                 reader = SOperation(command);
 
@@ -1107,14 +1065,14 @@ namespace ReflectORM.Core
                     if (history != null)
                     {
                         history.Type = ChangeType.Insert;
-                        history.RecordId = iaData.Id;
+                        if (iaData != null) history.RecordId = iaData.Id;
 
                         ManageSaveChanges(data, history, true);
                     }
                 }
                 else
                 {
-                    retVal = iiData.Id;
+                    retVal = iiData != null ? iiData.Id : DbConstants.DEFAULT_ID;
                 }
             }
             finally
@@ -1134,16 +1092,16 @@ namespace ReflectORM.Core
         /// <returns></returns>
         protected virtual List<PropertyInfo> ManageSaveChanges(T data, History history, bool insert)
         {
-            IAuditable iData = data as IAuditable;
+            var iData = data as IAuditable;
 
             if (iData == null)  //we can only manage auditable types
                 return new List<PropertyInfo>();
 
-            T currentData = insert ? default(T) : SGet(iData.Id, true);
+            var currentData = insert ? default(T) : SGet(iData.Id, true);
 
-            IAuditable iOldData = currentData as IAuditable;
+            var iOldData = currentData as IAuditable;
 
-            List<PropertyInfo> changedProperties = new List<PropertyInfo>();
+            List<PropertyInfo> changedProperties;
             if (insert) //this is new data
             {
                 changedProperties = new List<PropertyInfo>(typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public));
@@ -1151,29 +1109,36 @@ namespace ReflectORM.Core
             else //updating
             {
                 //these properties are the same forever
-                iData.CreatedBy = iOldData.CreatedBy;
-                iData.CreatedOn = iOldData.CreatedOn;
+                if (iOldData != null)
+                {
+                    iData.CreatedBy = iOldData.CreatedBy;
+                    iData.CreatedOn = iOldData.CreatedOn;
+                }
 
                 var comparer = new ObjectComparer<T>();
                 var comparison = comparer.Compare(currentData, data);
                 changedProperties = comparison.ChangedProperties;
             }
 
-            List<HistoryColumn> columnhistories = CreateColumnHistories(currentData, data, changedProperties, history);
+            var columnhistories = CreateColumnHistories(currentData, data, changedProperties, history);
             if (columnhistories.Count > 0)
             {
-                HistoryHandler handler = new HistoryHandler(this.Connection.ConnectionString);
-                handler.DatabaseTableName = HistoryTableName;
+                var handler = new HistoryHandler(Connection.ConnectionString)
+                    {
+                        DatabaseTableName = HistoryTableName
+                    };
 
-                HistoryColumnHandler columnHandler = new HistoryColumnHandler(this.Connection.ConnectionString);
-                columnHandler.DatabaseTableName = HistoryColumnTableName;
+                var columnHandler = new HistoryColumnHandler(Connection.ConnectionString)
+                    {
+                        DatabaseTableName = HistoryColumnTableName
+                    };
 
-                if (history.CreatedOn == null || history.CreatedOn < SqlDateTime.MinValue.Value)
+                if (history.CreatedOn < SqlDateTime.MinValue.Value)
                     history.CreatedOn = DateTime.Now;
                 history.Id = handler.SSave(history);
                 history.Columns = columnhistories;
 
-                foreach (HistoryColumn hc in columnhistories)
+                foreach (var hc in columnhistories)
                 {
                     hc.HistoryId = history.Id;
                     columnHandler.SSave(hc);
@@ -1200,47 +1165,41 @@ namespace ReflectORM.Core
         /// <returns></returns>
         protected virtual List<HistoryColumn> CreateColumnHistories(T oldData, T newData, List<PropertyInfo> properties, History history)
         {
-            List<HistoryColumn> columnHistories = new List<HistoryColumn>();
+            var columnHistories = new List<HistoryColumn>();
 
-            foreach (PropertyInfo property in properties)
+            foreach (var property in properties)
             {
-                bool auditable = true;
-                string colName = property.Name;
-                bool write = true;
+                var auditable = true;
+                var colName = property.Name;
+                var write = true;
 
-                object[] attributes = property.GetCustomAttributes(typeof(ReflectORM.Attributes.ControllablePropertyAttribute), true);
+                var attributes = property.GetCustomAttributes(typeof(ControllablePropertyAttribute), true);
                 if (attributes.Length > 0) //it does have the attribute.
                 {
-                    ReflectORM.Attributes.ControllablePropertyAttribute fda = (ReflectORM.Attributes.ControllablePropertyAttribute)attributes[0];
+                    var fda = (ControllablePropertyAttribute)attributes[0];
                     auditable = fda.Auditable;
                     colName = fda.ColumnName ?? property.Name;
                     write = fda.Write;
                 }
-                if (auditable)
+
+                if (!auditable) continue;
+                if (!property.CanRead) continue;
+                if (!write) continue;
+
+                var hc = new HistoryColumn {HistoryId = history.Id, Column = colName};
+
+                if (oldData.IsNull())
+                    hc.OldValue = null;
+                else
                 {
-                    if (property.CanRead)
-                    {
-                        if (write)
-                        {
-                            HistoryColumn hc = new HistoryColumn();
-
-                            hc.HistoryId = history.Id;
-                            hc.Column = colName;
-                            if (oldData.IsNull())
-                                hc.OldValue = null;
-                            else
-                            {
-                                object oldValue = property.GetValue(oldData, null);
-                                hc.OldValue = oldValue;
-                            }
-
-                            object value = property.GetValue(newData, null);
-                            hc.NewValue = value;
-
-                            columnHistories.Add(hc);
-                        }
-                    }
+                    var oldValue = property.GetValue(oldData, null);
+                    hc.OldValue = oldValue;
                 }
+
+                var value = property.GetValue(newData, null);
+                hc.NewValue = value;
+
+                columnHistories.Add(hc);
             }
 
             return columnHistories;
@@ -1286,7 +1245,7 @@ namespace ReflectORM.Core
         /// </summary>
         protected new DbTransaction BeginTransaction()
         {
-            DbConnection connection = ProfiledConnection;
+            var connection = ProfiledConnection;
             if (connection.State == ConnectionState.Closed)
                 connection.Open();
 
@@ -1311,8 +1270,7 @@ namespace ReflectORM.Core
         /// </returns>
         public virtual T Get(int id)
         {
-            ListDictionary list = new ListDictionary();
-            list.Add(string.Format("@{0}", IdColumn), id);
+            var list = new ListDictionary {{string.Format("@{0}", IdColumn), id}};
 
             return Operation(SelectCommand, list, FromDb, true);
         }
@@ -1345,7 +1303,7 @@ namespace ReflectORM.Core
         /// <returns></returns>
         public virtual bool SDelete(int id, ref History history)
         {
-            Criteria criterion = new Criteria(IdColumn, ColumnType.Int, id);
+            var criterion = new Criteria(IdColumn, ColumnType.Int, id);
             return SDeleteByCriteria(criterion, ref history);
         }
 
@@ -1378,8 +1336,7 @@ namespace ReflectORM.Core
                 value = dateValue.ToString("s");
             }
 
-            var colCriteria = new Criteria(column, value);
-            colCriteria.SearchType = SearchType.Equals;
+            var colCriteria = new Criteria(column, value) {SearchType = SearchType.Equals};
 
             return SDeleteByCriteria(colCriteria, ref history);
         }
@@ -1394,23 +1351,21 @@ namespace ReflectORM.Core
         {
             if (history == null || (!(typeof(T).IsSubclassOf(typeof(Auditable)))))
             {
-                DbCommand command = ProfiledConnection.CreateCommand();
+                var command = ProfiledConnection.CreateCommand();
 
-                SQLGenerator<T> generator = new SQLGenerator<T>(command);
+                var generator = new SQLGenerator<T>(command);
                 generator.Criteria.Add(criterion);
 
                 command.CommandText = generator.GenerateDelete(DatabaseTableName);
 
                 return (SOperation(command, FromDb) == null);
             }
-            else
+            History lastHistory = null;
+            history.Type = ChangeType.Delete;
+            var deleteList = SGetByCriteria(criterion);
+            foreach (IAuditable data in deleteList)
             {
-                History lastHistory = null;
-                history.Type = ChangeType.Delete;
-                List<T> deleteList = SGetByCriteria(criterion);
-                foreach (IAuditable data in deleteList)
-                {
-                    History dataHistory = new History()
+                var dataHistory = new History
                     {
                         Comment = history.Comment,
                         Committed = history.Committed,
@@ -1419,12 +1374,11 @@ namespace ReflectORM.Core
                         Published = history.Published,
                         Type = history.Type
                     };
-                    data.Deleted = true;
-                    SSave((T)data, ref dataHistory);
-                    lastHistory = dataHistory;
-                }
-                history = lastHistory;
+                data.Deleted = true;
+                SSave((T)data, ref dataHistory);
+                lastHistory = dataHistory;
             }
+            history = lastHistory;
             return true;
         }
 
@@ -1469,10 +1423,9 @@ namespace ReflectORM.Core
         /// <returns></returns>
         public virtual bool SExistsForColumn(object value, string column, bool ignoreDeletedStatus)
         {
-            var criteria = new Criteria(column, ColumnType.Auto, value);
-            criteria.SearchType = SearchType.Equals;
+            var criteria = new Criteria(column, ColumnType.Auto, value) {SearchType = SearchType.Equals};
 
-            return SExistsForCriteria(new List<Criteria>() { criteria }, ignoreDeletedStatus);
+            return SExistsForCriteria(new List<Criteria> { criteria }, ignoreDeletedStatus);
         }
 
         /// <summary>
@@ -1493,10 +1446,7 @@ namespace ReflectORM.Core
             var reader = SOperation(comm);
             try
             {
-                if (reader == null)
-                    return false;
-
-                return reader.HasRows;
+                return reader != null && reader.HasRows;
             }
             finally
             {
@@ -1522,12 +1472,11 @@ namespace ReflectORM.Core
         /// <returns></returns>
         public virtual T SGet(int id, bool ignoreDeletedStatus)
         {
-            DbCommand command = ProfiledConnection.CreateCommand();
+            var command = ProfiledConnection.CreateCommand();
 
-            Criteria criterion = new Criteria(IdColumn, ColumnType.Int, id);
-            criterion.SearchType = SearchType.Equals;
+            var criterion = new Criteria(IdColumn, ColumnType.Int, id) {SearchType = SearchType.Equals};
 
-            SQLGenerator<T> generator = new SQLGenerator<T>(command, ignoreDeletedStatus);
+            var generator = new SQLGenerator<T>(command, ignoreDeletedStatus);
             generator.Criteria.Add(criterion);
             generator.Joins.AddRange(GetJoins());
 
@@ -1543,15 +1492,13 @@ namespace ReflectORM.Core
         /// <returns>Returns the record if it is deleted, otherwise returns null.</returns>
         public virtual T SGetDeleted(int id)
         {
-            DbCommand command = ProfiledConnection.CreateCommand();
+            var command = ProfiledConnection.CreateCommand();
 
-            Criteria idCrit = new Criteria(IdColumn, ColumnType.Int, id);
-            idCrit.SearchType = SearchType.Equals;
+            var idCrit = new Criteria(IdColumn, ColumnType.Int, id) {SearchType = SearchType.Equals};
 
-            Criteria delCrit = new Criteria("Deleted", ColumnType.Bool, true);
-            delCrit.SearchType = SearchType.Equals;
+            var delCrit = new Criteria("Deleted", ColumnType.Bool, true) {SearchType = SearchType.Equals};
 
-            SQLGenerator<T> generator = new SQLGenerator<T>(command, true);
+            var generator = new SQLGenerator<T>(command, true);
             generator.Criteria.Add(idCrit);
             generator.Criteria.Add(delCrit);
             generator.Joins.AddRange(GetJoins());
@@ -1569,7 +1516,7 @@ namespace ReflectORM.Core
         /// <returns></returns>
         public virtual History SGetLatestHistoryColumn(int id, string columnName)
         {
-            HistoryHandler hc = new HistoryHandler(this.Connection.ConnectionString);
+            var hc = new HistoryHandler(Connection.ConnectionString);
 
             return hc.GetLatestRecord(id, HistoryTableName, HistoryColumnTableName, columnName);
         }
@@ -1598,13 +1545,14 @@ namespace ReflectORM.Core
         /// <returns></returns>
         public virtual IList<T> SGetAll(bool sorted, IEnumerable<Criteria> criteria)
         {
-            DbCommand command = ProfiledConnection.CreateCommand();
+            var command = ProfiledConnection.CreateCommand();
 
-            SQLGenerator<T> generator = new SQLGenerator<T>(command);
+            var generator = new SQLGenerator<T>(command);
             if (sorted)
                 generator.OrderBy.Add(SortColumn);
-            if (criteria != null && !criteria.IsEmpty())
-                generator.Criteria.AddRange(criteria);
+            var criterias = criteria as IList<Criteria> ?? criteria.ToList();
+            if (criteria != null && !criterias.IsEmpty())
+                generator.Criteria.AddRange(criterias);
 
             DbUtilities.ValidateSearchCriteria(generator.Criteria);
 
@@ -1622,11 +1570,10 @@ namespace ReflectORM.Core
         /// <returns>True if the record exists, else false.</returns>
         public virtual bool Exists(int id)
         {
-            ListDictionary list = new ListDictionary();
-            list.Add(string.Format("@{0}", IdColumn), id);
+            var list = new ListDictionary {{string.Format("@{0}", IdColumn), id}};
 
-            DbDataReader reader = Operation(SelectCommand, list, _transaction == null);
-            bool exists = reader.HasRows;
+            var reader = Operation(SelectCommand, list, _transaction == null);
+            var exists = reader.HasRows;
 
             CleanUp(reader);
 
@@ -1653,8 +1600,7 @@ namespace ReflectORM.Core
         public virtual bool Delete(int id, DbTransaction transaction)
         {
             _transaction = transaction;
-            ListDictionary list = new ListDictionary();
-            list.Add(string.Format("@{0}", IdColumn), id);
+            var list = new ListDictionary {{string.Format("@{0}", IdColumn), id}};
 
             CleanUp(Operation(DeleteCommand, list, false));
 
@@ -1667,8 +1613,7 @@ namespace ReflectORM.Core
         /// <returns>All of this type.</returns>
         public virtual List<T> GetAll()
         {
-            ListDictionary list = new ListDictionary();
-            list.Add(string.Format("@{0}", IdColumn), DBNull.Value);
+            var list = new ListDictionary {{string.Format("@{0}", IdColumn), DBNull.Value}};
 
             return OperationList(SelectCommand, list, FromDb, true);
         }
@@ -1681,29 +1626,27 @@ namespace ReflectORM.Core
         /// <returns></returns>
         public virtual List<T> SGetCommon(T data, string column)
         {
-            Type type = typeof(T);
-            PropertyInfo[] properties = type.GetProperties(BindingFlags.Instance | BindingFlags.Public);
+            var type = typeof(T);
+            var properties = type.GetProperties(BindingFlags.Instance | BindingFlags.Public);
 
-            foreach (PropertyInfo property in properties)
+            foreach (var property in properties)
             {
                 if (property.Name != column)
                     continue;
 
-                if (property.CanRead)
+                if (!property.CanRead) continue;
+                var attributes = property.GetCustomAttributes(typeof(ControllablePropertyAttribute), true);
+
+                var colName = property.Name;
+                if (attributes.Length > 0) //it does have the attribute.
                 {
-                    object[] attributes = property.GetCustomAttributes(typeof(ReflectORM.Attributes.ControllablePropertyAttribute), true);
-
-                    string colName = property.Name;
-                    if (attributes.Length > 0) //it does have the attribute.
-                    {
-                        ReflectORM.Attributes.ControllablePropertyAttribute fda = (ReflectORM.Attributes.ControllablePropertyAttribute)attributes[0];
-                        colName = fda.ColumnName ?? property.Name;
-                    }
-
-                    object actualValue = property.GetValue(data, null);
-
-                    return SGetForColumn(actualValue, colName);
+                    var fda = (ControllablePropertyAttribute)attributes[0];
+                    colName = fda.ColumnName ?? property.Name;
                 }
+
+                var actualValue = property.GetValue(data, null);
+
+                return SGetForColumn(actualValue, colName);
             }
 
             throw new InvalidOperationException(string.Format("Invalid column {0}", column));
@@ -1753,8 +1696,7 @@ namespace ReflectORM.Core
                 value = dateValue.ToString("s");
             }
 
-            var colCriteria = new Criteria(column, value);
-            colCriteria.SearchType = SearchType.Equals;
+            var colCriteria = new Criteria(column, value) {SearchType = SearchType.Equals};
 
             if (colValue is int)
                 colCriteria.Type = ColumnType.Int;
@@ -1795,9 +1737,9 @@ namespace ReflectORM.Core
         /// <returns></returns>
         public List<T> SGetByCriteria(Criteria criterion, bool sorted, bool ignoreDeletedStatus)
         {
-            DbCommand command = ProfiledConnection.CreateCommand();
+            var command = ProfiledConnection.CreateCommand();
 
-            SQLGenerator<T> generator = new SQLGenerator<T>(command, ignoreDeletedStatus);
+            var generator = new SQLGenerator<T>(command, ignoreDeletedStatus);
 
             generator.Joins.AddRange(GetJoins());
             generator.Criteria.Add(criterion);
@@ -1823,7 +1765,7 @@ namespace ReflectORM.Core
 
             var reader = SOperation(command, true);
 
-            int count = 0;
+            var count = 0;
             try
             {
                 if (reader.Read())
@@ -1849,55 +1791,50 @@ namespace ReflectORM.Core
             var type = typeof(T);
             var properties = type.GetProperties(BindingFlags.Instance | BindingFlags.Public);
 
-            var sb = new StringBuilder();
-
-            foreach (PropertyInfo property in properties)
+            foreach (var property in properties)
             {
-                if (property.CanRead)
+                if (!property.CanRead) continue;
+                var attributes = property.GetCustomAttributes(typeof(ControllablePropertyAttribute), true);
+
+                var colName = property.Name;
+                var paramName = property.Name;
+                var delimiter = char.MinValue;
+                var write = true;
+                if (attributes.Length > 0) //it does have the attribute.
                 {
-                    var attributes = property.GetCustomAttributes(typeof(Attributes.ControllablePropertyAttribute), true);
-
-                    var colName = property.Name;
-                    var paramName = property.Name;
-                    var delimiter = char.MinValue;
-                    var write = true;
-                    if (attributes.Length > 0) //it does have the attribute.
-                    {
-                        var fda = (Attributes.ControllablePropertyAttribute)attributes[0];
-                        colName = fda.ColumnName ?? property.Name;
-                        paramName = fda.ParameterName ?? colName;
-                        delimiter = fda.StringSplitDelimiter;
-                        write = fda.Write;
-                    }
-
-                    //don't add the Id column if we're inserting
-                    if (!InsertId && !IsUpdatable(data) && colName.ToLower() == IdColumn.ToLower())
-                        continue;
-
-                    if (write)
-                    {
-                        var value = property.GetValue(data, null);
-
-                        if (property.PropertyType.IsEnum)
-                            value = value.ToString();
-
-                        if (delimiter != char.MinValue)
-                            if (value is IList)
-                            {
-                                var newVal = string.Empty;
-                                var values = (IList<string>)value;
-                                newVal = values.Aggregate(newVal, (current, s) => string.Format("{0}{1}", current, s));
-
-                                value = newVal;
-                            }
-
-                        if (!paramName.StartsWith("@"))
-                            paramName = string.Format("@{0}", paramName);   //prefix the name with the required @
-                        if (value == null)
-                            value = DBNull.Value;
-                        command.AddParameterWithValue(paramName, value);
-                    }
+                    var fda = (ControllablePropertyAttribute)attributes[0];
+                    colName = fda.ColumnName ?? property.Name;
+                    paramName = fda.ParameterName ?? colName;
+                    delimiter = fda.StringSplitDelimiter;
+                    write = fda.Write;
                 }
+
+                //don't add the Id column if we're inserting
+                if (!InsertId && !IsUpdatable(data) && colName.ToLower() == IdColumn.ToLower())
+                    continue;
+
+                if (!write) continue;
+
+                var value = property.GetValue(data, null);
+
+                if (property.PropertyType.IsEnum)
+                    value = value.ToString();
+
+                if (delimiter != char.MinValue)
+                    if (value is IList)
+                    {
+                        var newVal = string.Empty;
+                        var values = (IList<string>)value;
+                        newVal = values.Aggregate(newVal, (current, s) => string.Format("{0}{1}", current, s));
+
+                        value = newVal;
+                    }
+
+                if (!paramName.StartsWith("@"))
+                    paramName = string.Format("@{0}", paramName);   //prefix the name with the required @
+                if (value == null)
+                    value = DBNull.Value;
+                command.AddParameterWithValue(paramName, value);
             }
         }
 
@@ -1923,63 +1860,58 @@ namespace ReflectORM.Core
         /// <returns>A T from the reader.</returns>
         public virtual T FromDb(IDataRecord reader)
         {
-            object id = null;
+            var type = typeof(T);
+            var variable = Activator.CreateInstance<T>();
+            var properties = type.GetProperties(BindingFlags.Instance | BindingFlags.Public);
 
-            Type type = typeof(T);
-            T variable = System.Activator.CreateInstance<T>();
-            PropertyInfo[] properties = type.GetProperties(BindingFlags.Instance | BindingFlags.Public);
-
-            StringBuilder sb = new StringBuilder();
-
-            foreach (PropertyInfo property in properties)
+            foreach (var property in properties)
             {
-                if (property.CanWrite)
+                if (!property.CanWrite) continue;
+                var attributes = property.GetCustomAttributes(typeof(ControllablePropertyAttribute), true);
+
+                var colName = property.Name;
+                var delimiter = char.MinValue;
+                var read = true;
+                if (attributes.Length > 0) //it does have the attribute.
                 {
-                    object[] attributes = property.GetCustomAttributes(typeof(ReflectORM.Attributes.ControllablePropertyAttribute), true);
+                    var fda = (ControllablePropertyAttribute)attributes[0];
+                    colName = fda.ColumnName ?? property.Name;
+                    delimiter = fda.StringSplitDelimiter != char.MinValue ? fda.StringSplitDelimiter : char.MinValue;
+                    read = fda.Read;
+                }
 
-                    string colName = property.Name;
-                    char delimiter = char.MinValue;
-                    Type enumType = null;
-                    bool read = true;
-                    if (attributes.Length > 0) //it does have the attribute.
+                if (!reader.FieldExists(colName) || !read) continue;
+
+                var value = reader[colName];
+
+                if (value == DBNull.Value)
+                {
+                    if (property.PropertyType == typeof(DateTime))
+                        value = SqlDateTime.MinValue.Value;
+                    else
+                        value = null;
+                }
+
+                if (delimiter != char.MinValue)
+                {
+                    var s = (string) value;
+                    if (s != null) value = new List<string>(s.Split(delimiter));
+                }
+
+                if (property.PropertyType.IsEnum)
+                    if (Enum.IsDefined(property.PropertyType, value))
+                        value = Enum.Parse(property.PropertyType, (string)value, true);
+
+                try
+                {
+                    property.SetValue(variable, value, null);
+
+                    if (colName == IdColumn) //this is the idProperty
                     {
-                        ReflectORM.Attributes.ControllablePropertyAttribute fda = (ReflectORM.Attributes.ControllablePropertyAttribute)attributes[0];
-                        colName = fda.ColumnName ?? property.Name;
-                        delimiter = fda.StringSplitDelimiter != char.MinValue ? fda.StringSplitDelimiter : char.MinValue;
-                        enumType = fda.EnumType;
-                        read = fda.Read;
-                    }
-
-                    if (reader.FieldExists(colName) && read)
-                    {
-                        object value = reader[colName];
-
-                        if (value == DBNull.Value)
-                        {
-                            if (property.PropertyType == typeof(DateTime))
-                                value = SqlDateTime.MinValue.Value;
-                            else
-                                value = null;
-                        }
-
-                        if (delimiter != char.MinValue)
-                            value = new List<string>(((string)value).Split(delimiter));
-
-                        if (property.PropertyType.IsEnum)
-                            if (Enum.IsDefined(property.PropertyType, (string)value))
-                                value = Enum.Parse(property.PropertyType, (string)value, true);
-
-                        try
-                        {
-                            property.SetValue(variable, value, null);
-
-                            if (colName == IdColumn) //this is the idProperty
-                                id = value;
-                        }
-                        catch (TargetException) { }  //if we can't set the property, just leave it empty
-                        catch (ArgumentException) { }  //if we can't set the property, just leave it empty
                     }
                 }
+                catch (TargetException) { }  //if we can't set the property, just leave it empty
+                catch (ArgumentException) { }  //if we can't set the property, just leave it empty
             }
 
             return variable;
@@ -2013,25 +1945,23 @@ namespace ReflectORM.Core
         /// <returns>SqlXml</returns>
         public virtual SqlXml ConvertCollectionToXml<Y>(Dictionary<string, string> collectionItems, IList<Y> collection, string collectionName)
         {
-            MemoryStream stream = new MemoryStream();
-            StringBuilder builder = new StringBuilder();
-            using (XmlWriter writer = XmlWriter.Create(stream))
+            var stream = new MemoryStream();
+            using (var writer = XmlWriter.Create(stream))
             {
                 writer.WriteStartElement(collectionName);
-                foreach (Y t in collection)
+                foreach (var d in collection.Select(t => PropertiesToXML(t)))
                 {
-                    Dictionary<string, string> d = PropertiesToXML(t);
                     writer.WriteStartElement("row");
-                    foreach (string propertyName in collectionItems.Keys)
+                    foreach (var propertyName in collectionItems.Keys)
                     {
-                        string value = propertyName;
-                        string par = collectionItems[propertyName];
+                        var value = propertyName;
+                        var par = collectionItems[propertyName];
                         writer.WriteAttributeString(par, value);
                     }
-                    foreach (string propertyName in d.Keys)
+                    foreach (var propertyName in d.Keys)
                     {
-                        string value = propertyName;
-                        string par = d[propertyName];
+                        var value = propertyName;
+                        var par = d[propertyName];
                         writer.WriteAttributeString(par, value);
                     }
                     writer.WriteEndElement();

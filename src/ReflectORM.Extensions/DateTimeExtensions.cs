@@ -60,7 +60,7 @@ namespace ReflectORM.Extensions
         /// <summary>
         /// Gets a relative date time string from today.
         /// </summary>
-        /// <param name="time">The time.</param>
+        /// <param name="dateTime">The time.</param>
         /// <returns></returns>
         public static string GetRelativeDateTimeString(this DateTime dateTime)
         {
